@@ -1,0 +1,1776 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>基于差分隐私的医疗数据统计查询系统</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.15);
+            overflow: hidden;
+            animation: fadeIn 0.8s ease-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            animation: pulse 4s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.5; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+        }
+        
+        .header h1 {
+            font-size: 2.8em;
+            margin-bottom: 15px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .header p {
+            font-size: 1.3em;
+            opacity: 0.9;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .content {
+            padding: 30px;
+        }
+        
+        .section {
+            margin-bottom: 30px;
+            padding: 25px;
+            border-radius: 15px;
+            background: #f8f9fa;
+            border-left: 5px solid #3498db;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        
+        .section:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        
+        .section h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .privacy-dashboard {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            position: relative;
+        }
+        
+        .privacy-level {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .epsilon-display {
+            font-size: 3em;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .privacy-strength {
+            text-align: right;
+        }
+        
+        .privacy-meter {
+            width: 100%;
+            height: 10px;
+            background: rgba(255,255,255,0.3);
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 15px;
+        }
+        
+        .privacy-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #e74c3c 0%, #f39c12 50%, #27ae60 100%);
+            border-radius: 10px;
+            transition: width 0.5s ease;
+        }
+        
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+        
+        .control-group {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            transition: all 0.3s ease;
+        }
+        
+        .control-group:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+        
+        .control-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 0.95em;
+        }
+        
+        .control-group select,
+        .control-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e8ecef;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        
+        .control-group select:focus,
+        .control-group input:focus {
+            border-color: #3498db;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+        }
+        
+        .range-container {
+            position: relative;
+        }
+        
+        .range-value {
+            position: absolute;
+            right: 0;
+            top: -25px;
+            background: #3498db;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+        
+        .button {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(52, 152, 219, 0.4);
+        }
+        
+        .button:active {
+            transform: translateY(-1px);
+        }
+        
+        .button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        .button:hover::before {
+            left: 100%;
+        }
+        
+        .button-group {
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .data-overview {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .stat-item {
+            text-align: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 12px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .stat-item:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+        }
+        
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #3498db;
+            display: block;
+            margin-bottom: 8px;
+        }
+        
+        .stat-label {
+            color: #7f8c8d;
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+        
+        .results {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 20px;
+            margin-top: 25px;
+        }
+        
+        .result-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+            border-top: 4px solid #e74c3c;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .result-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+        }
+        
+        .result-card h3 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.4em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .result-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #ecf0f1;
+        }
+        
+        .result-item:last-child {
+            border-bottom: none;
+        }
+        
+        .result-label {
+            font-weight: 600;
+            color: #34495e;
+        }
+        
+        .result-value {
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+        
+        .true-value {
+            color: #27ae60;
+        }
+        
+        .private-value {
+            color: #e74c3c;
+        }
+        
+        .error-value {
+            color: #f39c12;
+        }
+        
+        .chart-container {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+        }
+        
+        .chart-canvas {
+            max-height: 400px;
+        }
+        
+        .tooltip {
+            position: relative;
+            display: inline-block;
+            cursor: help;
+        }
+        
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 300px;
+            background-color: #2c3e50;
+            color: #fff;
+            text-align: left;
+            border-radius: 8px;
+            padding: 15px;
+            position: absolute;
+            z-index: 1000;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -150px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+        
+        .tooltip .tooltiptext::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: #2c3e50 transparent transparent transparent;
+        }
+        
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #ecf0f1;
+            border-radius: 3px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3498db, #2980b9);
+            transition: width 0.5s ease;
+        }
+        
+        .alert {
+            padding: 15px 20px;
+            margin: 15px 0;
+            border-radius: 8px;
+            font-weight: 500;
+        }
+        
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border-left: 4px solid #17a2b8;
+        }
+        
+        .alert-warning {
+            background: #fff3cd;
+            color: #856404;
+            border-left: 4px solid #ffc107;
+        }
+        
+        .tabs {
+            display: flex;
+            background: #f8f9fa;
+            border-radius: 10px 10px 0 0;
+            overflow: hidden;
+            margin-bottom: 0;
+        }
+        
+        .tab {
+            flex: 1;
+            padding: 15px 20px;
+            background: #f8f9fa;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            color: #6c757d;
+        }
+        
+        .tab.active {
+            background: white;
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+        }
+        
+        .tab-content {
+            background: white;
+            padding: 25px;
+            border-radius: 0 0 10px 10px;
+            min-height: 200px;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+                border-radius: 15px;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .content {
+                padding: 20px;
+            }
+            
+            .controls {
+                grid-template-columns: 1fr;
+            }
+            
+            .results {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏥 差分隐私医疗数据查询系统</h1>
+            <p>在严格保护患者隐私的同时提供准确的医疗统计信息</p>
+        </div>
+        
+        <div class="content">
+            <!-- 隐私仪表板 -->
+            <div class="section">
+                <div class="privacy-dashboard">
+                    <div class="privacy-level">
+                        <div>
+                            <h3>🔒 当前隐私保护级别</h3>
+                            <div class="epsilon-display">ε = <span id="epsilonValue">1.0</span></div>
+                        </div>
+                        <div class="privacy-strength">
+                            <div id="privacyStrength">中等保护</div>
+                            <div style="font-size: 0.9em; opacity: 0.8;">隐私预算余额: <span id="budgetRemaining">100%</span></div>
+                        </div>
+                    </div>
+                    <div class="privacy-meter">
+                        <div class="privacy-fill" id="privacyMeter"></div>
+                    </div>
+                    <div class="alert alert-info" style="margin-top: 15px; background: rgba(255,255,255,0.1); color: white; border-left-color: rgba(255,255,255,0.3);">
+                        <strong>差分隐私原理：</strong>通过向查询结果添加校准的随机噪声，确保任何单个患者的信息都无法被推断出来。ε值越小，隐私保护越强，但查询结果的误差也越大。
+                    </div>
+                </div>
+            </div>
+
+            <!-- 控制面板 -->
+            <div class="section">
+                <h2>⚙️ 查询配置</h2>
+                <div class="controls">
+                    <div class="control-group">
+                        <label for="epsilon" class="tooltip">
+                            隐私参数 ε
+                            <span class="tooltiptext">
+                                <strong>隐私参数 ε 的含义：</strong><br>
+                                • ε ≤ 0.5: 极强隐私保护，高噪声<br>
+                                • 0.5 < ε ≤ 1.0: 强隐私保护，中等噪声<br>
+                                • 1.0 < ε ≤ 2.0: 中等隐私保护，较低噪声<br>
+                                • ε > 2.0: 较弱隐私保护，低噪声
+                            </span>
+                        </label>
+                        <div class="range-container">
+                            <input type="range" id="epsilon" min="0.1" max="5.0" step="0.1" value="1.0">
+                            <div class="range-value" id="epsilonRange">1.0</div>
+                        </div>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label for="queryType" class="tooltip">
+                            查询类型
+                            <span class="tooltiptext">
+                                <strong>支持的查询类型：</strong><br>
+                                • 计数查询：统计满足条件的记录数量<br>
+                                • 平均值查询：计算指定列的平均值<br>
+                                • 求和查询：计算指定列的总和<br>
+                                • 最值查询：找出最大值或最小值
+                            </span>
+                        </label>
+                        <select id="queryType">
+                            <option value="count">计数查询</option>
+                            <option value="mean">平均值查询</option>
+                            <option value="sum">求和查询</option>
+                            <option value="min">最小值查询</option>
+                            <option value="max">最大值查询</option>
+                        </select>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label for="column" class="tooltip">
+                            目标列
+                            <span class="tooltiptext">
+                                <strong>可查询的数据列：</strong><br>
+                                • 年龄：患者年龄（18-100岁）<br>
+                                • 血压：收缩压数值（80-200 mmHg）<br>
+                                • 胆固醇：总胆固醇水平（120-400 mg/dL）<br>
+                                • 血糖：空腹血糖值（60-300 mg/dL）<br>
+                                • BMI：身体质量指数（15-50）
+                            </span>
+                        </label>
+                        <select id="column">
+                            <option value="age">年龄 (岁)</option>
+                            <option value="blood_pressure">血压 (mmHg)</option>
+                            <option value="cholesterol">胆固醇 (mg/dL)</option>
+                            <option value="glucose">血糖 (mg/dL)</option>
+                            <option value="bmi">BMI指数</option>
+                        </select>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label for="condition" class="tooltip">
+                            筛选条件
+                            <span class="tooltiptext">
+                                <strong>支持的筛选条件：</strong><br>
+                                • 无条件：查询所有患者<br>
+                                • 疾病筛选：按特定疾病类型筛选<br>
+                                • 年龄筛选：按年龄段筛选<br>
+                                • 性别筛选：按性别筛选
+                            </span>
+                        </label>
+                        <select id="condition">
+                            <option value="none">无条件</option>
+                            <option value="diabetes">糖尿病患者</option>
+                            <option value="hypertension">高血压患者</option>
+                            <option value="hyperlipidemia">高血脂患者</option>
+                            <option value="cardiovascular">心血管疾病患者</option>
+                            <option value="elderly">老年患者 (>60岁)</option>
+                            <option value="young">年轻患者 (<40岁)</option>
+                            <option value="male">男性患者</option>
+                            <option value="female">女性患者</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="button-group">
+                    <button class="button" onclick="generateData()">🔄 生成新数据集</button>
+                    <button class="button" onclick="executeQuery()">🔍 执行查询</button>
+                    <button class="button" onclick="comparePrivacyLevels()">📊 隐私级别对比</button>
+                    <button class="button" onclick="showPrivacyTrend()">📈 隐私-效用趋势</button>
+                    <button class="button" onclick="clearResults()">🗑️ 清除结果</button>
+                </div>
+            </div>
+
+            <!-- 数据概览 -->
+            <div class="section">
+                <h2>📋 数据集概览</h2>
+                <div class="data-overview">
+                    <p>当前数据集包含 <strong id="totalRecords">0</strong> 条患者记录，涵盖多项健康指标和疾病诊断信息。</p>
+                    <div class="stats-grid" id="dataStats">
+                        <!-- 动态生成数据统计 -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- 结果展示 -->
+            <div class="section">
+                <h2>📈 查询结果与分析</h2>
+                
+                <!-- 标签页 -->
+                <div class="tabs">
+                    <button class="tab active" onclick="showTab('results')">查询结果</button>
+                    <button class="tab" onclick="showTab('charts')">可视化分析</button>
+                    <button class="tab" onclick="showTab('history')">查询历史</button>
+                    <button class="tab" onclick="showTab('explanation')">结果解释</button>
+                </div>
+                
+                <div class="tab-content">
+                    <!-- 查询结果标签页 -->
+                    <div id="results-tab" class="tab-panel">
+                        <div class="results" id="queryResults">
+                            <div class="result-card">
+                                <h3>💡 使用说明</h3>
+                                <div class="alert alert-info">
+                                    <strong>开始使用：</strong><br>
+                                    1. 首先点击"生成新数据集"创建模拟医疗数据<br>
+                                    2. 调整隐私参数ε和查询配置<br>
+                                    3. 点击"执行查询"查看结果<br>
+                                    4. 尝试不同的隐私级别对比效果
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 可视化分析标签页 -->
+                    <div id="charts-tab" class="tab-panel hidden">
+                        <div class="chart-container">
+                            <h3>隐私-效用权衡曲线</h3>
+                            <canvas id="privacyChart" class="chart-canvas"></canvas>
+                        </div>
+                        <div class="chart-container">
+                            <h3>数据分布可视化</h3>
+                            <canvas id="distributionChart" class="chart-canvas"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- 查询历史标签页 -->
+                    <div id="history-tab" class="tab-panel hidden">
+                        <div id="queryHistory">
+                            <p class="text-muted">暂无查询历史记录。执行查询后，历史记录将显示在这里。</p>
+                        </div>
+                    </div>
+                    
+                    <!-- 结果解释标签页 -->
+                    <div id="explanation-tab" class="tab-panel hidden">
+                        <div id="resultExplanation">
+                            <h3>🎯 如何理解查询结果</h3>
+                            <div class="alert alert-info">
+                                执行查询后，这里将显示详细的结果解释和隐私保护效果分析。
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        let medicalData = [];
+        let dpSystem = null;
+        let queryHistory = [];
+        let privacyBudgetUsed = 0;
+        let charts = {};
+
+        // 差分隐私系统类
+        class DifferentialPrivacySystem {
+            constructor(epsilon = 1.0) {
+                this.epsilon = epsilon;
+                this.data = [];
+                this.queryCount = 0;
+            }
+            
+            setEpsilon(epsilon) {
+                this.epsilon = parseFloat(epsilon);
+            }
+            
+            loadData(data) {
+                this.data = data;
+            }
+            
+            calculateSensitivity(queryType, column = null) {
+                if (queryType === 'count') {
+                    return 1.0;
+                } else if (['sum', 'mean', 'min', 'max'].includes(queryType)) {
+                    if (!column) return 1.0;
+                    
+                    const values = this.data.map(row => row[column]).filter(v => !isNaN(v));
+                    if (values.length === 0) return 1.0;
+                    
+                    const max = Math.max(...values);
+                    const min = Math.min(...values);
+                    
+                    if (queryType === 'sum') {
+                        return max - min;
+                    } else if (queryType === 'mean') {
+                        return (max - min) / this.data.length;
+                    } else if (queryType === 'min' || queryType === 'max') {
+                        return max - min;
+                    }
+                }
+                return 1.0;
+            }
+            
+            addLaplaceNoise(trueResult, sensitivity) {
+                const scale = sensitivity / this.epsilon;
+                const u1 = Math.random();
+                const noise = u1 > 0.5 ? 
+                    -scale * Math.log(2 * (1 - u1)) : 
+                    scale * Math.log(2 * u1);
+                
+                return trueResult + noise;
+            }
+            
+            applyCondition(condition) {
+                let filteredData = [...this.data];
+                
+                switch(condition) {
+                    case 'diabetes':
+                        filteredData = filteredData.filter(row => row.disease === 'diabetes');
+                        break;
+                    case 'hypertension':
+                        filteredData = filteredData.filter(row => row.disease === 'hypertension');
+                        break;
+                    case 'hyperlipidemia':
+                        filteredData = filteredData.filter(row => row.disease === 'hyperlipidemia');
+                        break;
+                    case 'cardiovascular':
+                        filteredData = filteredData.filter(row => row.disease === 'cardiovascular');
+                        break;
+                    case 'elderly':
+                        filteredData = filteredData.filter(row => row.age > 60);
+                        break;
+                    case 'young':
+                        filteredData = filteredData.filter(row => row.age < 40);
+                        break;
+                    case 'male':
+                        filteredData = filteredData.filter(row => row.gender === 'M');
+                        break;
+                    case 'female':
+                        filteredData = filteredData.filter(row => row.gender === 'F');
+                        break;
+                    default:
+                        break;
+                }
+                
+                return filteredData;
+            }
+            
+            executeQuery(queryType, column = null, condition = 'none') {
+                const filteredData = this.applyCondition(condition);
+                let trueResult = 0;
+                
+                if (queryType === 'count') {
+                    trueResult = filteredData.length;
+                } else if (queryType === 'sum') {
+                    trueResult = filteredData.reduce((sum, row) => sum + (row[column] || 0), 0);
+                } else if (queryType === 'mean') {
+                    if (filteredData.length === 0) return { trueResult: 0, privateResult: 0, sensitivity: 0, relativeError: 0 };
+                    trueResult = filteredData.reduce((sum, row) => sum + (row[column] || 0), 0) / filteredData.length;
+                } else if (queryType === 'min') {
+                    if (filteredData.length === 0) return { trueResult: 0, privateResult: 0, sensitivity: 0, relativeError: 0 };
+                    trueResult = Math.min(...filteredData.map(row => row[column] || 0));
+                } else if (queryType === 'max') {
+                    if (filteredData.length === 0) return { trueResult: 0, privateResult: 0, sensitivity: 0, relativeError: 0 };
+                    trueResult = Math.max(...filteredData.map(row => row[column] || 0));
+                }
+                
+                const sensitivity = this.calculateSensitivity(queryType, column);
+                const privateResult = this.addLaplaceNoise(trueResult, sensitivity);
+                
+                this.queryCount++;
+                
+                return {
+                    trueResult,
+                    privateResult: Math.max(0, privateResult),
+                    sensitivity,
+                    relativeError: trueResult > 0 ? Math.abs(trueResult - privateResult) / trueResult : 0,
+                    filteredCount: filteredData.length
+                };
+            }
+        }
+        
+        // 生成正态分布随机数
+        function normalRandom(mean, std) {
+            const u1 = Math.random();
+            const u2 = Math.random();
+            const z0 = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+            return z0 * std + mean;
+        }
+        
+        // 生成模拟医疗数据
+        function generateMedicalData(nPatients = 1500) {
+            const data = [];
+            
+            for (let i = 0; i < nPatients; i++) {
+                const age = Math.max(18, Math.min(100, Math.round(normalRandom(52, 22))));
+                const gender = Math.random() > 0.48 ? 'F' : 'M';
+                const bloodPressure = Math.max(80, Math.min(200, Math.round(normalRandom(115 + (age - 30) * 0.4, 18))));
+                const cholesterol = Math.max(120, Math.min(400, Math.round(normalRandom(175 + (age - 30) * 0.5, 35))));
+                const glucose = Math.max(60, Math.min(300, Math.round(normalRandom(92 + (age - 40) * 0.2, 22))));
+                const bmi = Math.max(15, Math.min(50, Math.round(normalRandom(24.5 + (age - 40) * 0.05, 5.5) * 10) / 10));
+                
+                let disease = 'healthy';
+                const ageRisk = age > 55 ? (age - 55) / 45 : 0;
+                const bpRisk = bloodPressure > 130 ? (bloodPressure - 130) / 70 : 0;
+                const glucoseRisk = glucose > 100 ? (glucose - 100) / 200 : 0;
+                const cholRisk = cholesterol > 200 ? (cholesterol - 200) / 200 : 0;
+                
+                const totalRisk = ageRisk + bpRisk + glucoseRisk + cholRisk;
+                const random = Math.random();
+                
+                if (totalRisk > 1.5 && random < 0.3) {
+                    if (bloodPressure > 140) disease = 'hypertension';
+                    else if (glucose > 126) disease = 'diabetes';
+                    else if (cholesterol > 240) disease = 'hyperlipidemia';
+                    else if (age > 65) disease = 'cardiovascular';
+                } else if (totalRisk > 1.0 && random < 0.2) {
+                    if (glucose > 126) disease = 'diabetes';
+                    else if (cholesterol > 240) disease = 'hyperlipidemia';
+                    else if (bloodPressure > 140) disease = 'hypertension';
+                } else if (totalRisk > 0.5 && random < 0.1) {
+                    const diseases = ['diabetes', 'hyperlipidemia', 'hypertension'];
+                    disease = diseases[Math.floor(Math.random() * diseases.length)];
+                }
+                
+                data.push({
+                    patientId: i + 1,
+                    age,
+                    gender,
+                    blood_pressure: bloodPressure,
+                    cholesterol,
+                    glucose,
+                    bmi,
+                    disease
+                });
+            }
+            
+            return data;
+        }
+        
+        // 初始化系统
+        function initSystem() {
+            dpSystem = new DifferentialPrivacySystem(1.0);
+            updateEpsilonDisplay();
+            updatePrivacyMeter();
+            
+            // 添加事件监听器
+            document.getElementById('epsilon').addEventListener('input', function() {
+                const epsilon = parseFloat(this.value);
+                dpSystem.setEpsilon(epsilon);
+                updateEpsilonDisplay();
+                updatePrivacyMeter();
+                updatePrivacyBudget();
+            });
+            
+            document.getElementById('queryType').addEventListener('change', updateColumnVisibility);
+            updateColumnVisibility();
+        }
+        
+        // 更新隐私参数显示
+        function updateEpsilonDisplay() {
+            const epsilon = document.getElementById('epsilon').value;
+            document.getElementById('epsilonValue').textContent = epsilon;
+            document.getElementById('epsilonRange').textContent = epsilon;
+            
+            let strengthText = '';
+            let strengthColor = '';
+            
+            if (epsilon <= 0.5) {
+                strengthText = '极强保护';
+                strengthColor = '#e74c3c';
+            } else if (epsilon <= 1.0) {
+                strengthText = '强保护';
+                strengthColor = '#f39c12';
+            } else if (epsilon <= 2.0) {
+                strengthText = '中等保护';
+                strengthColor = '#3498db';
+            } else if (epsilon <= 3.0) {
+                strengthText = '较弱保护';
+                strengthColor = '#95a5a6';
+            } else {
+                strengthText = '弱保护';
+                strengthColor = '#27ae60';
+            }
+            
+            const strengthElement = document.getElementById('privacyStrength');
+            strengthElement.textContent = strengthText;
+            strengthElement.style.color = strengthColor;
+        }
+        
+        // 更新隐私仪表
+        function updatePrivacyMeter() {
+            const epsilon = parseFloat(document.getElementById('epsilon').value);
+            const percentage = Math.max(0, Math.min(100, (5 - epsilon) / 4.9 * 100));
+            document.getElementById('privacyMeter').style.width = percentage + '%';
+        }
+        
+        // 更新隐私预算
+        function updatePrivacyBudget() {
+            const remaining = Math.max(0, 100 - privacyBudgetUsed);
+            document.getElementById('budgetRemaining').textContent = remaining.toFixed(1) + '%';
+        }
+        
+        // 更新列显示
+        function updateColumnVisibility() {
+            const queryType = document.getElementById('queryType').value;
+            const columnGroup = document.getElementById('column').closest('.control-group');
+            
+            if (queryType === 'count') {
+                columnGroup.style.opacity = '0.5';
+                columnGroup.style.pointerEvents = 'none';
+            } else {
+                columnGroup.style.opacity = '1';
+                columnGroup.style.pointerEvents = 'auto';
+            }
+        }
+        
+        // 生成新数据
+        function generateData() {
+            const button = event.target;
+            const originalText = button.innerHTML;
+            button.innerHTML = '<span class="loading"></span>生成中...';
+            button.disabled = true;
+            
+            setTimeout(() => {
+                medicalData = generateMedicalData(1500);
+                dpSystem.loadData(medicalData);
+                displayDataOverview();
+                
+                button.innerHTML = originalText;
+                button.disabled = false;
+                
+                showNotification('✅ 成功生成1500条患者记录', 'success');
+            }, 1000);
+        }
+        
+        // 显示数据概览
+        function displayDataOverview() {
+            document.getElementById('totalRecords').textContent = medicalData.length;
+            
+            const diseases = {};
+            let totalAge = 0;
+            let totalBP = 0;
+            let maleCount = 0;
+            
+            medicalData.forEach(patient => {
+                diseases[patient.disease] = (diseases[patient.disease] || 0) + 1;
+                totalAge += patient.age;
+                totalBP += patient.blood_pressure;
+                if (patient.gender === 'M') maleCount++;
+            });
+            
+            const diseaseEntries = Object.entries(diseases).sort((a, b) => b[1] - a[1]);
+            const topDisease = diseaseEntries[0];
+            
+            const statsHTML = `
+                <div class="stat-item" onclick="showDataDetail('total')">
+                    <span class="stat-number">${medicalData.length}</span>
+                    <div class="stat-label">总患者数</div>
+                </div>
+                <div class="stat-item" onclick="showDataDetail('age')">
+                    <span class="stat-number">${Math.round(totalAge / medicalData.length)}</span>
+                    <div class="stat-label">平均年龄</div>
+                </div>
+                <div class="stat-item" onclick="showDataDetail('gender')">
+                    <span class="stat-number">${Math.round(maleCount / medicalData.length * 100)}%</span>
+                    <div class="stat-label">男性比例</div>
+                </div>
+                <div class="stat-item" onclick="showDataDetail('bp')">
+                    <span class="stat-number">${Math.round(totalBP / medicalData.length)}</span>
+                    <div class="stat-label">平均血压</div>
+                </div>
+                <div class="stat-item" onclick="showDataDetail('disease')">
+                    <span class="stat-number">${topDisease ? topDisease[1] : 0}</span>
+                    <div class="stat-label">${getDiseaseName(topDisease ? topDisease[0] : 'healthy')}</div>
+                </div>
+            `;
+            
+            document.getElementById('dataStats').innerHTML = statsHTML;
+            
+            updateDistributionChart();
+        }
+        
+        // 获取疾病中文名
+        function getDiseaseName(disease) {
+            const names = {
+                'healthy': '健康人群',
+                'diabetes': '糖尿病',
+                'hypertension': '高血压',
+                'hyperlipidemia': '高血脂',
+                'cardiovascular': '心血管病'
+            };
+            return names[disease] || disease;
+        }
+        
+        // 执行查询
+        function executeQuery() {
+            if (!medicalData.length) {
+                showNotification('⚠️ 请先生成数据集', 'warning');
+                return;
+            }
+            
+            const queryType = document.getElementById('queryType').value;
+            const column = document.getElementById('column').value;
+            const condition = document.getElementById('condition').value;
+            
+            const button = event.target;
+            const originalText = button.innerHTML;
+            button.innerHTML = '<span class="loading"></span>查询中...';
+            button.disabled = true;
+            
+            setTimeout(() => {
+                const result = dpSystem.executeQuery(queryType, column, condition);
+                displayQueryResult(result, queryType, column, condition);
+                addToHistory(result, queryType, column, condition);
+                updatePrivacyBudgetUsage();
+                
+                button.innerHTML = originalText;
+                button.disabled = false;
+                
+                showNotification('✅ 查询执行完成', 'success');
+            }, 800);
+        }
+        
+        // 显示查询结果
+        function displayQueryResult(result, queryType, column, condition) {
+            const queryTypeNames = {
+                'count': '计数查询',
+                'mean': '平均值查询',
+                'sum': '求和查询',
+                'min': '最小值查询',
+                'max': '最大值查询'
+            };
+            
+            const columnNames = {
+                'age': '年龄',
+                'blood_pressure': '血压',
+                'cholesterol': '胆固醇',
+                'glucose': '血糖',
+                'bmi': 'BMI'
+            };
+            
+            const conditionNames = {
+                'none': '无条件',
+                'diabetes': '糖尿病患者',
+                'hypertension': '高血压患者',
+                'hyperlipidemia': '高血脂患者',
+                'cardiovascular': '心血管疾病患者',
+                'elderly': '老年患者(>60岁)',
+                'young': '年轻患者(<40岁)',
+                'male': '男性患者',
+                'female': '女性患者'
+            };
+            
+            const errorLevel = result.relativeError < 0.05 ? 'low' : result.relativeError < 0.15 ? 'medium' : 'high';
+            const errorColor = errorLevel === 'low' ? '#27ae60' : errorLevel === 'medium' ? '#f39c12' : '#e74c3c';
+            
+            const resultHTML = `
+                <div class="result-card" style="border-top-color: ${errorColor}">
+                    <h3>🔍 查询结果</h3>
+                    <div class="result-item">
+                        <span class="result-label">查询类型:</span>
+                        <span>${queryTypeNames[queryType]}${queryType !== 'count' ? ' - ' + columnNames[column] : ''}</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">筛选条件:</span>
+                        <span>${conditionNames[condition]}</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">匹配记录数:</span>
+                        <span>${result.filteredCount}</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">真实值:</span>
+                        <span class="result-value true-value">${formatNumber(result.trueResult)}</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">隐私保护值:</span>
+                        <span class="result-value private-value">${formatNumber(result.privateResult)}</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">相对误差:</span>
+                        <span class="result-value error-value" style="color: ${errorColor}">${(result.relativeError * 100).toFixed(2)}%</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">敏感度:</span>
+                        <span class="result-value">${result.sensitivity.toFixed(3)}</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">隐私参数:</span>
+                        <span class="result-value">ε = ${dpSystem.epsilon}</span>
+                    </div>
+                </div>
+                
+                <div class="result-card">
+                    <h3>📊 结果分析</h3>
+                    <div class="alert ${getErrorAlertClass(result.relativeError)}">
+                        <strong>精度评估:</strong> ${getAccuracyDescription(result.relativeError)}<br>
+                        <strong>隐私保护:</strong> ${getPrivacyDescription(dpSystem.epsilon)}<br>
+                        <strong>建议:</strong> ${getRecommendation(result.relativeError, dpSystem.epsilon)}
+                    </div>
+                    <div style="margin-top: 15px;">
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${Math.min(100, result.relativeError * 500)}%"></div>
+                        </div>
+                        <small>误差水平指示器</small>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('queryResults').innerHTML = resultHTML;
+            updateResultExplanation(result, queryType, column, condition);
+        }
+        
+        // 格式化数字
+        function formatNumber(num) {
+            if (num === null || num === undefined) return 'N/A';
+            if (Math.abs(num) < 0.01) return num.toExponential(2);
+            if (Number.isInteger(num)) return num.toString();
+            return num.toFixed(2);
+        }
+        
+        // 获取误差警告类
+        function getErrorAlertClass(error) {
+            return error < 0.05 ? 'alert-info' : 'alert-warning';
+        }
+        
+        // 获取精度描述
+        function getAccuracyDescription(error) {
+            if (error < 0.02) return '非常高精度，误差很小';
+            if (error < 0.05) return '高精度，误差在可接受范围内';
+            if (error < 0.15) return '中等精度，适用于大多数分析';
+            return '较低精度，建议增加隐私参数或使用更大数据集';
+        }
+        
+        // 获取隐私描述
+        function getPrivacyDescription(epsilon) {
+            if (epsilon <= 0.5) return '极强隐私保护，几乎无法推断个体信息';
+            if (epsilon <= 1.0) return '强隐私保护，个体信息得到很好保护';
+            if (epsilon <= 2.0) return '中等隐私保护，在隐私和效用间取得平衡';
+            if (epsilon <= 3.0) return '较弱隐私保护，重点关注数据效用';
+            return '弱隐私保护，主要用于内部分析';
+        }
+        
+        // 获取建议
+        function getRecommendation(error, epsilon) {
+            if (error > 0.15 && epsilon < 1.0) {
+                return '误差较大，建议适当增加隐私参数ε以提高精度';
+            } else if (error < 0.02 && epsilon > 2.0) {
+                return '精度很高，可以考虑降低隐私参数ε以增强隐私保护';
+            } else {
+                return '当前配置在隐私保护和数据效用间达到了良好平衡';
+            }
+        }
+        
+        // 比较隐私级别
+        function comparePrivacyLevels() {
+            if (!medicalData.length) {
+                showNotification('⚠️ 请先生成数据集', 'warning');
+                return;
+            }
+            
+            const queryType = document.getElementById('queryType').value;
+            const column = document.getElementById('column').value;
+            const condition = document.getElementById('condition').value;
+            
+            const epsilons = [0.1, 0.5, 1.0, 2.0, 5.0];
+            const results = [];
+            
+            const button = event.target;
+            const originalText = button.innerHTML;
+            button.innerHTML = '<span class="loading"></span>对比中...';
+            button.disabled = true;
+            
+            setTimeout(() => {
+                epsilons.forEach(epsilon => {
+                    dpSystem.setEpsilon(epsilon);
+                    const result = dpSystem.executeQuery(queryType, column, condition);
+                    results.push({ epsilon, ...result });
+                });
+                
+                displayComparisonResults(results, queryType, column, condition);
+                
+                // 恢复原始epsilon值
+                const originalEpsilon = document.getElementById('epsilon').value;
+                dpSystem.setEpsilon(parseFloat(originalEpsilon));
+                
+                button.innerHTML = originalText;
+                button.disabled = false;
+                
+                showNotification('✅ 隐私级别对比完成', 'success');
+            }, 1500);
+        }
+        
+        // 显示对比结果
+        function displayComparisonResults(results, queryType, column, condition) {
+            let comparisonHTML = '<div class="results" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">';
+            
+            results.forEach(result => {
+                const privacyLevel = result.epsilon <= 0.5 ? '极强' : 
+                                   result.epsilon <= 1.0 ? '强' : 
+                                   result.epsilon <= 2.0 ? '中等' :
+                                   result.epsilon <= 3.0 ? '较弱' : '弱';
+                const privacyColor = result.epsilon <= 0.5 ? '#e74c3c' : 
+                                    result.epsilon <= 1.0 ? '#f39c12' : 
+                                    result.epsilon <= 2.0 ? '#3498db' :
+                                    result.epsilon <= 3.0 ? '#95a5a6' : '#27ae60';
+                
+                comparisonHTML += `
+                    <div class="result-card" style="border-top-color: ${privacyColor}">
+                        <h3 style="color: ${privacyColor}">ε = ${result.epsilon} (${privacyLevel}隐私)</h3>
+                        <div class="result-item">
+                            <span class="result-label">真实值:</span>
+                            <span class="result-value true-value">${formatNumber(result.trueResult)}</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">保护值:</span>
+                            <span class="result-value private-value">${formatNumber(result.privateResult)}</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">相对误差:</span>
+                            <span class="result-value error-value">${(result.relativeError * 100).toFixed(2)}%</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">敏感度:</span>
+                            <span class="result-value">${result.sensitivity.toFixed(3)}</span>
+                        </div>
+                        <div style="margin-top: 10px;">
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: ${Math.min(100, result.relativeError * 300)}%; background: ${privacyColor};"></div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            comparisonHTML += '</div>';
+            comparisonHTML += `
+                <div class="alert alert-info" style="margin-top: 20px;">
+                    <strong>对比分析：</strong>从左到右隐私保护强度递减，查询精度递增。
+                    选择合适的ε值需要在隐私保护和数据效用之间找到最佳平衡点。
+                </div>
+            `;
+            
+            document.getElementById('queryResults').innerHTML = comparisonHTML;
+            updatePrivacyTrendChart(results);
+        }
+        
+        // 显示隐私趋势
+        function showPrivacyTrend() {
+            if (!medicalData.length) {
+                showNotification('⚠️ 请先生成数据集', 'warning');
+                return;
+            }
+            
+            const queryType = document.getElementById('queryType').value;
+            const column = document.getElementById('column').value;
+            const condition = document.getElementById('condition').value;
+            
+            const epsilons = [];
+            for (let e = 0.1; e <= 5.0; e += 0.2) {
+                epsilons.push(parseFloat(e.toFixed(1)));
+            }
+            
+            const button = event.target;
+            const originalText = button.innerHTML;
+            button.innerHTML = '<span class="loading"></span>分析中...';
+            button.disabled = true;
+            
+            setTimeout(() => {
+                const trendData = [];
+                
+                epsilons.forEach(epsilon => {
+                    dpSystem.setEpsilon(epsilon);
+                    
+                    // 多次查询取平均值减少噪声影响
+                    let totalError = 0;
+                    const iterations = 5;
+                    
+                    for (let i = 0; i < iterations; i++) {
+                        const result = dpSystem.executeQuery(queryType, column, condition);
+                        totalError += result.relativeError;
+                    }
+                    
+                    const avgError = totalError / iterations;
+                    trendData.push({ epsilon, error: avgError });
+                });
+                
+                displayTrendAnalysis(trendData, queryType, column, condition);
+                
+                // 恢复原始epsilon值
+                const originalEpsilon = document.getElementById('epsilon').value;
+                dpSystem.setEpsilon(parseFloat(originalEpsilon));
+                
+                button.innerHTML = originalText;
+                button.disabled = false;
+                
+                showTab('charts');
+                showNotification('✅ 趋势分析完成', 'success');
+            }, 2000);
+        }
+        
+        // 显示趋势分析
+        function displayTrendAnalysis(trendData, queryType, column, condition) {
+            updatePrivacyTrendChart(trendData);
+            
+            const optimalPoint = findOptimalPrivacyPoint(trendData);
+            const resultHTML = `
+                <div class="result-card">
+                    <h3>📈 隐私-效用趋势分析</h3>
+                    <div class="alert alert-info">
+                        <strong>分析结果：</strong><br>
+                        • 最优隐私参数：ε ≈ ${optimalPoint.epsilon}<br>
+                        • 此时相对误差：${(optimalPoint.error * 100).toFixed(2)}%<br>
+                        • 建议在 ${Math.max(0.1, optimalPoint.epsilon - 0.5).toFixed(1)} ~ ${Math.min(5.0, optimalPoint.epsilon + 0.5).toFixed(1)} 范围内选择参数
+                    </div>
+                    <p>曲线显示了隐私参数ε与查询误差的关系。ε值越小，隐私保护越强但误差越大；ε值越大，隐私保护越弱但结果越准确。</p>
+                </div>
+            `;
+            
+            document.getElementById('queryResults').innerHTML = resultHTML;
+        }
+        
+        // 找到最优隐私点
+        function findOptimalPrivacyPoint(trendData) {
+            // 寻找误差下降幅度开始变缓的拐点
+            let optimalPoint = trendData[Math.floor(trendData.length / 2)];
+            let minSlope = Infinity;
+            
+            for (let i = 1; i < trendData.length - 1; i++) {
+                const slope = Math.abs(trendData[i + 1].error - trendData[i - 1].error) / 
+                             (trendData[i + 1].epsilon - trendData[i - 1].epsilon);
+                
+                if (slope < minSlope && trendData[i].error < 0.1) {
+                    minSlope = slope;
+                    optimalPoint = trendData[i];
+                }
+            }
+            
+            return optimalPoint;
+        }
+        
+        // 清除结果
+        function clearResults() {
+            document.getElementById('queryResults').innerHTML = `
+                <div class="result-card">
+                    <h3>💡 使用说明</h3>
+                    <div class="alert alert-info">
+                        <strong>开始使用：</strong><br>
+                        1. 首先点击"生成新数据集"创建模拟医疗数据<br>
+                        2. 调整隐私参数ε和查询配置<br>
+                        3. 点击"执行查询"查看结果<br>
+                        4. 尝试不同的隐私级别对比效果
+                    </div>
+                </div>
+            `;
+            
+            // 清空图表
+            if (charts.privacy) {
+                charts.privacy.destroy();
+                charts.privacy = null;
+            }
+            if (charts.distribution) {
+                charts.distribution.destroy();
+                charts.distribution = null;
+            }
+            
+            // 重置隐私预算
+            privacyBudgetUsed = 0;
+            updatePrivacyBudget();
+            
+            showNotification('🗑️ 结果已清除', 'info');
+        }
+        
+        // 添加到历史记录
+        function addToHistory(result, queryType, column, condition) {
+            const historyItem = {
+                timestamp: new Date().toLocaleString(),
+                queryType,
+                column,
+                condition,
+                epsilon: dpSystem.epsilon,
+                result
+            };
+            
+            queryHistory.unshift(historyItem);
+            if (queryHistory.length > 10) {
+                queryHistory = queryHistory.slice(0, 10);
+            }
+            
+            updateHistoryDisplay();
+        }
+        
+        // 更新历史显示
+        function updateHistoryDisplay() {
+            const historyContainer = document.getElementById('queryHistory');
+            
+            if (queryHistory.length === 0) {
+                historyContainer.innerHTML = '<p class="text-muted">暂无查询历史记录。</p>';
+                return;
+            }
+            
+            let historyHTML = '';
+            queryHistory.forEach((item, index) => {
+                const queryTypeNames = {
+                    'count': '计数',
+                    'mean': '平均值',
+                    'sum': '求和',
+                    'min': '最小值',
+                    'max': '最大值'
+                };
+                
+                historyHTML += `
+                    <div class="result-card" style="margin-bottom: 15px;">
+                        <h4>#${index + 1} - ${item.timestamp}</h4>
+                        <div class="result-item">
+                            <span class="result-label">查询:</span>
+                            <span>${queryTypeNames[item.queryType]} (ε=${item.epsilon})</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">结果:</span>
+                            <span>${formatNumber(item.result.privateResult)} (误差: ${(item.result.relativeError * 100).toFixed(2)}%)</span>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            historyContainer.innerHTML = historyHTML;
+        }
+        
+        // 更新结果解释
+        function updateResultExplanation(result, queryType, column, condition) {
+            const explanationContainer = document.getElementById('resultExplanation');
+            
+            const explanationHTML = `
+                <h3>🎯 查询结果解释</h3>
+                <div class="alert alert-info">
+                    <strong>本次查询详情：</strong><br>
+                    查询类型：${queryType}<br>
+                    隐私参数：ε = ${dpSystem.epsilon}<br>
+                    全局敏感度：${result.sensitivity.toFixed(3)}<br>
+                    添加的噪声尺度：${(result.sensitivity / dpSystem.epsilon).toFixed(3)}
+                </div>
+                
+                <h4>🔍 结果分析</h4>
+                <p><strong>真实值 vs 隐私保护值：</strong></p>
+                <p>真实查询结果为 ${formatNumber(result.trueResult)}，添加拉普拉斯噪声后得到隐私保护值 ${formatNumber(result.privateResult)}。</p>
+                
+                <p><strong>误差分析：</strong></p>
+                <p>相对误差为 ${(result.relativeError * 100).toFixed(2)}%，${result.relativeError < 0.05 ? '属于高精度范围' : result.relativeError < 0.15 ? '属于中等精度范围' : '误差较大，建议调整参数'}。</p>
+                
+                <p><strong>隐私保护分析：</strong></p>
+                <p>当前ε=${dpSystem.epsilon}，${getPrivacyDescription(dpSystem.epsilon)}。即使攻击者知道除某个患者外所有其他患者的完整信息，也无法通过查询结果推断出该患者的敏感信息。</p>
+                
+                <h4>🛡️ 差分隐私机制</h4>
+                <p>系统使用拉普拉斯机制实现差分隐私保护：</p>
+                <ol>
+                    <li><strong>敏感度计算：</strong>分析查询函数对单个记录变化的敏感程度</li>
+                    <li><strong>噪声生成：</strong>根据敏感度和隐私参数生成拉普拉斯分布噪声</li>
+                    <li><strong>结果扰动：</strong>将噪声添加到真实查询结果上</li>
+                </ol>
+                
+                <p>这种方法确保了严格的数学隐私保证，即满足ε-差分隐私定义。</p>
+                
+                <div class="alert alert-warning">
+                    <strong>注意：</strong>每次查询都会消耗隐私预算。在实际应用中，需要合理分配隐私预算，避免过度查询导致隐私保护失效。
+                </div>
+            `;
+            
+            explanationContainer.innerHTML = explanationHTML;
+        }
+        
+        // 更新隐私预算使用
+        function updatePrivacyBudgetUsage() {
+            privacyBudgetUsed += parseFloat(document.getElementById('epsilon').value);
+            updatePrivacyBudget();
+        }
+        
+        // 显示通知
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `alert alert-${type}`;
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                z-index: 10000;
+                max-width: 300px;
+                opacity: 0;
+                transform: translateX(100%);
+                transition: all 0.3s ease;
+            `;
+            notification.innerHTML = message;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.opacity = '1';
+                notification.style.transform = 'translateX(0)';
+            }, 100);
+            
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                notification.style.transform = 'translateX(100%)';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300);
+            }, 3000);
+        }
+        
+        // 标签页切换
+        function showTab(tabName) {
+            // 隐藏所有标签页内容
+            document.querySelectorAll('.tab-panel').forEach(panel => {
+                panel.classList.add('hidden');
+            });
+            
+            // 移除所有标签的活动状态
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // 显示选中的标签页
+            document.getElementById(tabName + '-tab').classList.remove('hidden');
+            
+            // 激活对应标签
+            event.target.classList.add('active');
+        }
+        
+        // 更新隐私趋势图表
+        function updatePrivacyTrendChart(data) {
+            const ctx = document.getElementById('privacyChart').getContext('2d');
+            
+            if (charts.privacy) {
+                charts.privacy.destroy();
+            }
+            
+            charts.privacy = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.map(d => d.epsilon || d.epsilon),
+                    datasets: [{
+                        label: '相对误差 (%)',
+                        data: data.map(d => (d.error || d.relativeError) * 100),
+                        borderColor: '#3498db',
+                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: '#2980b9',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: '隐私参数 ε',
+                                font: { weight: 'bold' }
+                            },
+                            grid: { color: 'rgba(0,0,0,0.1)' }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: '相对误差 (%)',
+                                font: { weight: 'bold' }
+                            },
+                            grid: { color: 'rgba(0,0,0,0.1)' },
+                            beginAtZero: true
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0,0,0,0.8)',
+                            titleColor: '#fff',
+                            bodyColor: '#fff',
+                            callbacks: {
+                                title: function(context) {
+                                    return `隐私参数 ε = ${context[0].label}`;
+                                },
+                                label: function(context) {
+                                    return `相对误差: ${context.parsed.y.toFixed(2)}%`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 更新分布图表
+        function updateDistributionChart() {
+            if (!medicalData.length) return;
+            
+            const ctx = document.getElementById('distributionChart').getContext('2d');
+            
+            if (charts.distribution) {
+                charts.distribution.destroy();
+            }
+            
+            // 统计年龄分布
+            const ageRanges = ['18-30', '31-40', '41-50', '51-60', '61-70', '70+'];
+            const ageCounts = [0, 0, 0, 0, 0, 0];
+            
+            medicalData.forEach(patient => {
+                const age = patient.age;
+                if (age <= 30) ageCounts[0]++;
+                else if (age <= 40) ageCounts[1]++;
+                else if (age <= 50) ageCounts[2]++;
+                else if (age <= 60) ageCounts[3]++;
+                else if (age <= 70) ageCounts[4]++;
+                else ageCounts[5]++;
+            });
+            
+            charts.distribution = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ageRanges,
+                    datasets: [{
+                        label: '患者数量',
+                        data: ageCounts,
+                        backgroundColor: [
+                            'rgba(52, 152, 219, 0.8)',
+                            'rgba(46, 204, 113, 0.8)',
+                            'rgba(241, 196, 15, 0.8)',
+                            'rgba(231, 76, 60, 0.8)',
+                            'rgba(155, 89, 182, 0.8)',
+                            'rgba(149, 165, 166, 0.8)'
+                        ],
+                        borderColor: [
+                            '#3498db',
+                            '#2ecc71',
+                            '#f1c40f',
+                            '#e74c3c',
+                            '#9b59b6',
+                            '#95a5a6'
+                        ],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: '年龄范围',
+                                font: { weight: 'bold' }
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: '患者数量',
+                                font: { weight: 'bold' }
+                            },
+                            beginAtZero: true
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0,0,0,0.8)',
+                            callbacks: {
+                                title: function(context) {
+                                    return `年龄段: ${context[0].label}岁`;
+                                },
+                                label: function(context) {
+                                    const total = ageCounts.reduce((a, b) => a + b, 0);
+                                    const percentage = (context.parsed.y / total * 100).toFixed(1);
+                                    return `患者数: ${context.parsed.y} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 显示数据详情
+        function showDataDetail(type) {
+            // 这里可以添加更详细的数据展示逻辑
+            console.log(`显示${type}的详细信息`);
+        }
+        
+        // 页面加载时初始化
+        window.onload = function() {
+            initSystem();
+            
+            // 默认显示结果标签页
+            document.querySelector('.tab[onclick="showTab(\'results\')"]').classList.add('active');
+            document.getElementById('results-tab').classList.remove('hidden');
+        };
+    </script>
+</body>
+</html>
